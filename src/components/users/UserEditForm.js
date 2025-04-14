@@ -50,6 +50,10 @@ const userFormSchema = z.object({
   role: z.enum(["admin", "teacher", "student"], {
     required_error: "Please select a role",
   }),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .optional(),
 });
 
 export default function UserEditForm({ user, isOpen, onClose, onUserUpdated }) {
@@ -64,6 +68,7 @@ export default function UserEditForm({ user, isOpen, onClose, onUserUpdated }) {
       email: user?.email || "",
       userName: user?.userName || user?.displayName || "",
       role: user?.role || "student",
+      password: "",
     },
   });
 
@@ -77,14 +82,15 @@ export default function UserEditForm({ user, isOpen, onClose, onUserUpdated }) {
         });
         toast.success("User updated successfully");
       } else {
-        if (!data.email) {
-          toast.error("Email is required for new users");
+        if (!data.email || !data.password) {
+          toast.error("Email and password are required for new users");
           return;
         }
         await createUser({
           email: data.email,
           userName: data.userName,
           role: data.role,
+          password: data.password,
         });
         toast.success("User created successfully");
       }
@@ -130,23 +136,42 @@ export default function UserEditForm({ user, isOpen, onClose, onUserUpdated }) {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               {!isEditing && (
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="Enter email address"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder="Enter email address"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder="Enter password"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
               )}
 
               <FormField

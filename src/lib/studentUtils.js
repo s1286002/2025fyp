@@ -9,12 +9,11 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
-  addDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { deleteUser } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { registerUser } from "@/lib/authUtils";
+import { createUser } from "@/lib/userUtils";
 
 /**
  * Create a new student with Firebase Auth and Firestore record
@@ -23,15 +22,15 @@ import { registerUser } from "@/lib/authUtils";
  */
 export const createStudent = async (studentData) => {
   try {
-    // Use registerUser from authUtils to create both Auth and Firestore records
-    const user = await registerUser(
-      studentData.email,
-      studentData.password,
-      studentData.userName || studentData.email,
-      "student"
-    );
+    // Use createUser from userUtils to create both Auth and Firestore records
+    const userId = await createUser({
+      email: studentData.email,
+      password: studentData.password,
+      userName: studentData.userName,
+      role: "student",
+    });
 
-    return user.uid;
+    return userId;
   } catch (error) {
     console.error("Error creating student:", error);
     throw error;
@@ -108,23 +107,29 @@ export const updateStudent = async (studentId, updateData) => {
 /**
  * Delete a student
  * @param {string} studentId - Student ID
- * @returns {Promise<void>}
+ * @returns {Promise<{success: boolean, message: string}>}
  */
 export const deleteStudent = async (studentId) => {
   try {
     // First check if this is an auth user or just a Firestore record
     const userDoc = await getDoc(doc(db, "users", studentId));
 
+    if (!userDoc.exists()) {
+      return { success: false, message: "Student not found" };
+    }
+
+    let authDeleted = false;
     // If the document has a uid field, it's also an auth user
-    if (userDoc.exists() && userDoc.data().uid) {
+    if (userDoc.data().uid) {
+      const uid = userDoc.data().uid;
       try {
         // Get the current user from auth
         const currentUser = auth.currentUser;
 
         // Only delete the auth user if it's the same as the current user
-        // or if using admin SDK with proper permissions
-        if (currentUser && currentUser.uid === userDoc.data().uid) {
+        if (currentUser && currentUser.uid === uid) {
           await deleteUser(currentUser);
+          authDeleted = true;
         } else {
           console.warn(
             "Cannot delete Firebase Auth account - requires user to be logged in or Admin SDK"
@@ -138,8 +143,15 @@ export const deleteStudent = async (studentId) => {
 
     // Delete the Firestore document
     await deleteDoc(doc(db, "users", studentId));
+
+    return {
+      success: true,
+      message: authDeleted
+        ? "Student deleted from both Auth and Firestore"
+        : "Student deleted from Firestore only",
+    };
   } catch (error) {
     console.error("Error deleting student:", error);
-    throw error;
+    return { success: false, message: error.message };
   }
 };
