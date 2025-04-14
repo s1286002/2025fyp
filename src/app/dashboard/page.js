@@ -66,33 +66,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-
-        {isAdmin && (
-          <div className="mt-8">
-            <h2 className="text-lg font-medium mb-4">Admin Functions</h2>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle>User Management</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p>Manage teachers and admins</p>
-                  <p className="text-gray-500 mt-2">Coming soon</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>System Settings</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p>Configure application settings</p>
-                  <p className="text-gray-500 mt-2">Coming soon</p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
       </div>
     </ProtectedRoute>
   );

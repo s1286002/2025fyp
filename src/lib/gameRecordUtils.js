@@ -6,6 +6,9 @@ import {
   doc,
   getDoc,
   orderBy,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -200,5 +203,73 @@ export const getRawGameRecords = async (gameId) => {
   } catch (error) {
     console.error("Error fetching raw game records:", error);
     throw error;
+  }
+};
+
+/**
+ * Update a game record
+ * @param {string} recordId - Record ID
+ * @param {Object} updateData - Data to update (Level, Score, IsCompleted)
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export const updateGameRecord = async (recordId, updateData) => {
+  try {
+    const recordRef = doc(db, "userGameData", recordId);
+    const recordDoc = await getDoc(recordRef);
+
+    if (!recordDoc.exists()) {
+      return { success: false, message: "Record not found" };
+    }
+
+    // Prepare data - only update allowed fields
+    const dataToUpdate = {};
+    if (updateData.Level !== undefined) {
+      dataToUpdate.Level = Number(updateData.Level);
+    }
+    if (updateData.Score !== undefined) {
+      dataToUpdate.Score = Number(updateData.Score);
+    }
+    if (updateData.IsCompleted !== undefined) {
+      dataToUpdate.IsCompleted = updateData.IsCompleted;
+    }
+
+    // Add last modified timestamp
+    dataToUpdate.LastModified = serverTimestamp();
+
+    await updateDoc(recordRef, dataToUpdate);
+
+    return {
+      success: true,
+      message: "Game record updated successfully",
+    };
+  } catch (error) {
+    console.error("Error updating game record:", error);
+    return { success: false, message: error.message };
+  }
+};
+
+/**
+ * Delete a game record
+ * @param {string} recordId - Record ID
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export const deleteGameRecord = async (recordId) => {
+  try {
+    const recordRef = doc(db, "userGameData", recordId);
+    const recordDoc = await getDoc(recordRef);
+
+    if (!recordDoc.exists()) {
+      return { success: false, message: "Record not found" };
+    }
+
+    await deleteDoc(recordRef);
+
+    return {
+      success: true,
+      message: "Game record deleted successfully",
+    };
+  } catch (error) {
+    console.error("Error deleting game record:", error);
+    return { success: false, message: error.message };
   }
 };

@@ -1,15 +1,15 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  sendPasswordResetEmail,
-} from "firebase/auth";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import {
+  registerUser,
+  loginUser,
+  logoutUser,
+  resetUserPassword,
+} from "@/lib/authUtils";
 
 const AuthContext = createContext();
 
@@ -69,61 +69,24 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Register new user
+  // Register new user - using function from authUtils
   async function register(email, password, userName, role = "teacher") {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-
-      // Create user document in Firestore
-      await setDoc(doc(db, "users", userCredential.user.uid), {
-        uid: userCredential.user.uid,
-        email,
-        userName,
-        role,
-        createdAt: serverTimestamp(),
-        lastLogin: serverTimestamp(),
-      });
-
-      return userCredential.user;
-    } catch (error) {
-      throw error;
-    }
+    return registerUser(email, password, userName, role);
   }
 
-  // Login user
+  // Login user - using function from authUtils
   async function login(email, password) {
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-
-      // Update last login time
-      await setDoc(
-        doc(db, "users", userCredential.user.uid),
-        { lastLogin: serverTimestamp() },
-        { merge: true }
-      );
-
-      return userCredential.user;
-    } catch (error) {
-      throw error;
-    }
+    return loginUser(email, password);
   }
 
-  // Logout user
+  // Logout user - using function from authUtils
   async function logout() {
-    return signOut(auth);
+    return logoutUser();
   }
 
-  // Password reset
+  // Password reset - using function from authUtils
   async function resetPassword(email) {
-    return sendPasswordResetEmail(auth, email);
+    return resetUserPassword(email);
   }
 
   const value = {
