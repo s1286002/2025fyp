@@ -1,3 +1,4 @@
+import { app, db, auth } from "@/lib/firebase";
 import {
   doc,
   getDoc,
@@ -9,10 +10,13 @@ import {
   serverTimestamp,
   addDoc,
   deleteDoc,
+  setDoc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { deleteUser as deleteAuthUser } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import {
+  createUserWithEmailAndPassword,
+  deleteUser as deleteAuthUser,
+  updateCurrentUser,
+} from "firebase/auth";
 
 /**
  * Fetch user data by user ID
@@ -114,57 +118,6 @@ export const updateUserRole = async (userId, newRole) => {
 };
 
 /**
- * Migrate displayName to userName for admin and teacher users
- * @returns {Promise<{success: boolean, message: string}>}
- */
-export const migrateDisplayNameToUserName = async () => {
-  try {
-    // Query for admin and teacher users
-    const q = query(
-      collection(db, "users"),
-      where("role", "in", ["admin", "teacher"])
-    );
-    const querySnapshot = await getDocs(q);
-
-    const updatePromises = [];
-    let updateCount = 0;
-
-    querySnapshot.forEach((docSnapshot) => {
-      const userData = docSnapshot.data();
-      // Only update if displayName exists and userName doesn't
-      if (userData.displayName && !userData.userName) {
-        updateCount++;
-        const userRef = doc(db, "users", docSnapshot.id);
-        const updatePromise = updateDoc(userRef, {
-          userName: userData.displayName,
-          updatedAt: new Date(),
-        });
-        updatePromises.push(updatePromise);
-      }
-    });
-
-    if (updatePromises.length > 0) {
-      await Promise.all(updatePromises);
-      return {
-        success: true,
-        message: `Successfully migrated ${updateCount} users from displayName to userName`,
-      };
-    }
-
-    return {
-      success: true,
-      message: "No users needed migration",
-    };
-  } catch (error) {
-    console.error("Error migrating displayName to userName:", error);
-    return {
-      success: false,
-      message: "Failed to migrate users: " + error.message,
-    };
-  }
-};
-
-/**
  * Get display name for a user, preferring userName over displayName
  * @param {Object} user - User object
  * @returns {string} - User's display name
@@ -178,7 +131,7 @@ export const getDisplayName = (user) => {
 
 /**
  * Create a new user
- * @param {Object} userData - User data containing email, userName, and role
+ * @param {Object} userData - User data containing email, userName, password and role
  * @returns {Promise<string>} - ID of the created user
  */
 export const createUser = async (userData) => {
@@ -189,8 +142,21 @@ export const createUser = async (userData) => {
       throw new Error("Email already exists");
     }
 
-    // Create a new document in users collection
-    const userRef = await addDoc(collection(db, "users"), {
+    // Store the current auth state
+    let currentUser = auth.currentUser;
+    console.log("currentUser", currentUser);
+    // Create user with Firebase Auth
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      userData.email,
+      userData.password
+    );
+
+    const userId = userCredential.user.uid;
+
+    // Create user document in Firestore
+    await setDoc(doc(db, "users", userId), {
+      uid: userId,
       email: userData.email,
       userName: userData.userName,
       role: userData.role,
@@ -198,7 +164,10 @@ export const createUser = async (userData) => {
       updatedAt: serverTimestamp(),
     });
 
-    return userRef.id;
+    // Sign out the new user if there was a previous user
+    auth.updateCurrentUser(currentUser);
+
+    return userId;
   } catch (error) {
     console.error("Error creating user:", error);
     throw error;
@@ -223,22 +192,20 @@ export const deleteUser = async (userId) => {
     // If the document has a uid field matching its id, it's also an auth user
     if (userDoc.data().uid === userId) {
       try {
-        // Get the current user from auth
-        const currentUser = auth.currentUser;
-
-        // Only delete the auth user if it's the same as the current user
-        // or if using admin SDK with proper permissions
-        if (currentUser && currentUser.uid === userId) {
-          await deleteAuthUser(currentUser);
+        // Note: Deleting a user from client-side requires additional auth permissions
+        // This should typically be done from a server admin context
+        // For client-side, the user needs to be currently signed in
+        if (auth.currentUser && auth.currentUser.uid === userId) {
+          await deleteAuthUser(auth.currentUser);
           authDeleted = true;
         } else {
+          // For deleting other users, this should be handled by a Cloud Function or admin SDK
           console.warn(
-            "Cannot delete Firebase Auth account - requires user to be logged in or Admin SDK"
+            "Cannot delete auth user from client SDK - requires admin privileges"
           );
         }
       } catch (authError) {
         console.error("Error deleting auth user:", authError);
-        // Continue with Firestore deletion even if auth deletion fails
       }
     }
 
