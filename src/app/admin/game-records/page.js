@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { getRawGameRecords } from "@/lib/gameRecordUtils";
+import GameRecordEditForm from "@/components/admin/GameRecordEditForm";
 
 export default function GameRecordsPage() {
   const { user } = useAuth();
@@ -32,6 +33,8 @@ export default function GameRecordsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGame, setSelectedGame] = useState("Game1");
   const [levelFilter, setLevelFilter] = useState("all");
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
 
   const fetchGameRecords = async (gameId) => {
     try {
@@ -67,6 +70,15 @@ export default function GameRecordsPage() {
   const uniqueLevels = [...new Set(records.map((record) => record.Level))].sort(
     (a, b) => a - b
   );
+
+  const handleEditRecord = (record) => {
+    setEditingRecord(record);
+    setIsEditFormOpen(true);
+  };
+
+  const handleRecordUpdated = () => {
+    fetchGameRecords(selectedGame);
+  };
 
   return (
     <ProtectedRoute adminOnly={true}>
@@ -129,18 +141,19 @@ export default function GameRecordsPage() {
                   <TableHead>Score</TableHead>
                   <TableHead>Completed</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4">
+                    <TableCell colSpan={7} className="text-center py-4">
                       Loading records...
                     </TableCell>
                   </TableRow>
                 ) : filteredRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4">
+                    <TableCell colSpan={7} className="text-center py-4">
                       No records found
                     </TableCell>
                   </TableRow>
@@ -169,6 +182,15 @@ export default function GameRecordsPage() {
                           ? format(record.datetime, "yyyy/MM/dd HH:mm:ss")
                           : "N/A"}
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditRecord(record)}
+                        >
+                          Edit
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -177,6 +199,18 @@ export default function GameRecordsPage() {
           </div>
         </div>
       </div>
+
+      {editingRecord && (
+        <GameRecordEditForm
+          record={editingRecord}
+          isOpen={isEditFormOpen}
+          onClose={() => {
+            setIsEditFormOpen(false);
+            setEditingRecord(null);
+          }}
+          onRecordUpdated={handleRecordUpdated}
+        />
+      )}
     </ProtectedRoute>
   );
 }

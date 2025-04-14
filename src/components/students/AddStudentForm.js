@@ -16,6 +16,9 @@ const studentSchema = z.object({
   userName: z
     .string()
     .min(2, { message: "Name must be at least 2 characters" }),
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters" }),
 });
 
 export default function AddStudentForm({ onStudentAdded }) {
@@ -32,6 +35,7 @@ export default function AddStudentForm({ onStudentAdded }) {
     defaultValues: {
       email: "",
       userName: "",
+      password: "",
     },
   });
 
@@ -52,7 +56,6 @@ export default function AddStudentForm({ onStudentAdded }) {
           id: studentId,
           ...data,
           role: "student",
-          xp: 0,
         });
       }
     } catch (error) {
@@ -97,6 +100,22 @@ export default function AddStudentForm({ onStudentAdded }) {
               {errors.userName && (
                 <p className="text-sm text-red-500">
                   {errors.userName.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Password"
+                {...register("password")}
+                disabled={isLoading}
+              />
+              {errors.password && (
+                <p className="text-sm text-red-500">
+                  {errors.password.message}
                 </p>
               )}
             </div>

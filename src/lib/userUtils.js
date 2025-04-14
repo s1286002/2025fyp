@@ -8,8 +8,11 @@ import {
   updateDoc,
   serverTimestamp,
   addDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { deleteUser as deleteAuthUser } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 /**
  * Fetch user data by user ID
@@ -199,5 +202,57 @@ export const createUser = async (userData) => {
   } catch (error) {
     console.error("Error creating user:", error);
     throw error;
+  }
+};
+
+/**
+ * Delete a user from both Firestore and Firebase Auth (if possible)
+ * @param {string} userId - User ID to delete
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export const deleteUser = async (userId) => {
+  try {
+    // First check if this is an auth user or just a Firestore record
+    const userDoc = await getDoc(doc(db, "users", userId));
+
+    if (!userDoc.exists()) {
+      return { success: false, message: "User not found" };
+    }
+
+    let authDeleted = false;
+    // If the document has a uid field matching its id, it's also an auth user
+    if (userDoc.data().uid === userId) {
+      try {
+        // Get the current user from auth
+        const currentUser = auth.currentUser;
+
+        // Only delete the auth user if it's the same as the current user
+        // or if using admin SDK with proper permissions
+        if (currentUser && currentUser.uid === userId) {
+          await deleteAuthUser(currentUser);
+          authDeleted = true;
+        } else {
+          console.warn(
+            "Cannot delete Firebase Auth account - requires user to be logged in or Admin SDK"
+          );
+        }
+      } catch (authError) {
+        console.error("Error deleting auth user:", authError);
+        // Continue with Firestore deletion even if auth deletion fails
+      }
+    }
+
+    // Delete the Firestore document
+    await deleteDoc(doc(db, "users", userId));
+
+    return {
+      success: true,
+      message: authDeleted
+        ? "User deleted from both Auth and Firestore"
+        : "User deleted from Firestore only",
+    };
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    return { success: false, message: error.message };
   }
 };

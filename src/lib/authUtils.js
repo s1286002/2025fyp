@@ -1,3 +1,13 @@
+// Import required Firebase functions
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+} from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+
 /**
  * Convert Firebase auth error codes to readable messages
  * @param {string} errorCode - Firebase auth error code
@@ -74,4 +84,85 @@ export const validateEmail = (email) => {
   }
 
   return { valid: true, error: null };
+};
+
+/**
+ * Register a new user with Firebase Authentication and Firestore
+ * @param {string} email - User email
+ * @param {string} password - User password
+ * @param {string} userName - User display name
+ * @param {string} role - User role (default: "teacher")
+ * @returns {Promise<Object>} - Firebase user object
+ */
+export const registerUser = async (
+  email,
+  password,
+  userName,
+  role = "teacher"
+) => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    // Create user document in Firestore
+    await setDoc(doc(db, "users", userCredential.user.uid), {
+      uid: userCredential.user.uid,
+      email,
+      userName,
+      role,
+      createdAt: serverTimestamp(),
+      lastLogin: serverTimestamp(),
+    });
+
+    return userCredential.user;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Login a user with Firebase Authentication
+ * @param {string} email - User email
+ * @param {string} password - User password
+ * @returns {Promise<Object>} - Firebase user object
+ */
+export const loginUser = async (email, password) => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    // Update last login time
+    await setDoc(
+      doc(db, "users", userCredential.user.uid),
+      { lastLogin: serverTimestamp() },
+      { merge: true }
+    );
+
+    return userCredential.user;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Logout the current user
+ * @returns {Promise<void>}
+ */
+export const logoutUser = async () => {
+  return signOut(auth);
+};
+
+/**
+ * Send password reset email
+ * @param {string} email - User email
+ * @returns {Promise<void>}
+ */
+export const resetUserPassword = async (email) => {
+  return sendPasswordResetEmail(auth, email);
 };

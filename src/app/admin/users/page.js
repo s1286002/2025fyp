@@ -24,7 +24,7 @@ import { collection, query, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { migrateDisplayNameToUserName, getDisplayName } from "@/lib/userUtils";
+import { getDisplayName } from "@/lib/userUtils";
 import UserEditForm from "@/components/users/UserEditForm";
 
 export default function UserManagementPage() {
@@ -57,24 +57,6 @@ export default function UserManagementPage() {
   useEffect(() => {
     fetchUsers();
   }, []);
-
-  const handleMigration = async () => {
-    setIsMigrating(true);
-    try {
-      const result = await migrateDisplayNameToUserName();
-      if (result.success) {
-        toast.success(result.message);
-        await fetchUsers();
-      } else {
-        toast.error(result.message);
-      }
-    } catch (error) {
-      console.error("Migration error:", error);
-      toast.error("Failed to migrate users");
-    } finally {
-      setIsMigrating(false);
-    }
-  };
 
   const handleEditClick = (user) => {
     setSelectedUser(user);
@@ -138,13 +120,6 @@ export default function UserManagementPage() {
           </Select>
           <Button variant="outline" onClick={handleCreateClick}>
             Add User
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={handleMigration}
-            disabled={isMigrating}
-          >
-            {isMigrating ? "Migrating..." : "Migrate Names"}
           </Button>
         </div>
 
