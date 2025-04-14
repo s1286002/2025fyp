@@ -192,7 +192,7 @@ export const deleteUser = async (userId) => {
     // If the document has a uid field matching its id, it's also an auth user
     if (userDoc.data().uid === userId) {
       try {
-        await deleteAuthUser(auth.currentUser);
+        await deleteAuthUser(auth, userId);
         authDeleted = true;
       } catch (authError) {
         console.error("Error deleting auth user:", authError);
