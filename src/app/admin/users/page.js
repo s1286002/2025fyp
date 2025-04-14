@@ -26,6 +26,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { getDisplayName } from "@/lib/userUtils";
 import UserEditForm from "@/components/users/UserEditForm";
+import UserCreateForm from "@/components/users/UserCreateForm";
 
 export default function UserManagementPage() {
   const { user } = useAuth();
@@ -36,6 +37,7 @@ export default function UserManagementPage() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserForm, setShowUserForm] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -64,8 +66,7 @@ export default function UserManagementPage() {
   };
 
   const handleCreateClick = () => {
-    setSelectedUser(null);
-    setShowUserForm(true);
+    setShowCreateForm(true);
   };
 
   const handleCloseForm = () => {
@@ -74,6 +75,14 @@ export default function UserManagementPage() {
   };
 
   const handleUserUpdated = () => {
+    fetchUsers();
+  };
+
+  const handleCloseCreateForm = () => {
+    setShowCreateForm(false);
+  };
+
+  const handleUserCreated = () => {
     fetchUsers();
   };
 
@@ -118,9 +127,11 @@ export default function UserManagementPage() {
               <SelectItem value="student">Student</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={handleCreateClick}>
-            Add User
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleCreateClick}>
+              Add User
+            </Button>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -204,6 +215,14 @@ export default function UserManagementPage() {
             isOpen={showUserForm}
             onClose={handleCloseForm}
             onUserUpdated={handleUserUpdated}
+          />
+        )}
+
+        {showCreateForm && (
+          <UserCreateForm
+            isOpen={showCreateForm}
+            onClose={handleCloseCreateForm}
+            onUserCreated={handleUserCreated}
           />
         )}
       </div>
