@@ -1,4 +1,4 @@
-// Import required Firebase functions
+import { auth, db } from "@/lib/firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -6,7 +6,6 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
 
 /**
  * Convert Firebase auth error codes to readable messages
