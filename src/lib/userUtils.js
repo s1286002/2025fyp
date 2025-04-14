@@ -60,6 +60,8 @@ export const checkEmailExists = async (email) => {
  */
 export const updateUserProfile = async (userId, data) => {
   try {
+    console.log("userId", userId);
+    console.log("data", data);
     await updateDoc(doc(db, "users", userId), {
       ...data,
       updatedAt: serverTimestamp(),

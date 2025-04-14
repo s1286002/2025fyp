@@ -7,8 +7,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -37,12 +35,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createUser, updateUserProfile, deleteUser } from "@/lib/userUtils";
+import { updateUserProfile, deleteUser } from "@/lib/userUtils";
 import { toast } from "sonner";
 
-// Form validation schema
-const userFormSchema = z.object({
-  email: z.string().email("Invalid email address").optional(),
+const userEditSchema = z.object({
   userName: z
     .string()
     .min(2, "Username must be at least 2 characters")
@@ -50,57 +46,34 @@ const userFormSchema = z.object({
   role: z.enum(["admin", "teacher", "student"], {
     required_error: "Please select a role",
   }),
-  password: z
-    .string()
-    .min(6, "Password must be at least 6 characters")
-    .optional(),
 });
 
 export default function UserEditForm({ user, isOpen, onClose, onUserUpdated }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const isEditing = !!user;
 
   const form = useForm({
-    resolver: zodResolver(userFormSchema),
+    resolver: zodResolver(userEditSchema),
     defaultValues: {
-      email: user?.email || "",
       userName: user?.userName || user?.displayName || "",
       role: user?.role || "student",
-      password: "",
     },
   });
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     try {
-      if (isEditing) {
-        await updateUserProfile(user.id, {
-          userName: data.userName,
-          role: data.role,
-        });
-        toast.success("User updated successfully");
-      } else {
-        if (!data.email || !data.password) {
-          toast.error("Email and password are required for new users");
-          return;
-        }
-        await createUser({
-          email: data.email,
-          userName: data.userName,
-          role: data.role,
-          password: data.password,
-        });
-        toast.success("User created successfully");
-      }
+      await updateUserProfile(user.id, {
+        userName: data.userName,
+        role: data.role,
+      });
+      toast.success("User updated successfully");
       onUserUpdated();
       onClose();
     } catch (error) {
-      console.error("Error saving user:", error);
-      toast.error(
-        isEditing ? "Failed to update user" : "Failed to create user"
-      );
+      console.error("Error updating user:", error);
+      toast.error("Failed to update user");
     } finally {
       setIsSubmitting(false);
     }
@@ -131,49 +104,10 @@ export default function UserEditForm({ user, isOpen, onClose, onUserUpdated }) {
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit User" : "Create User"}</DialogTitle>
+            <DialogTitle>Edit User</DialogTitle>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {!isEditing && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="Enter email address"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Enter password"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
-
               <FormField
                 control={form.control}
                 name="userName"
@@ -215,16 +149,14 @@ export default function UserEditForm({ user, isOpen, onClose, onUserUpdated }) {
               />
 
               <div className="flex justify-between gap-4 pt-4">
-                {isEditing && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    disabled={isSubmitting || isDeleting}
-                  >
-                    {isDeleting ? "Deleting..." : "Delete User"}
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={isSubmitting || isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete User"}
+                </Button>
                 <div className="flex gap-2 ml-auto">
                   <Button
                     type="button"
@@ -235,13 +167,7 @@ export default function UserEditForm({ user, isOpen, onClose, onUserUpdated }) {
                     Cancel
                   </Button>
                   <Button type="submit" disabled={isSubmitting || isDeleting}>
-                    {isSubmitting
-                      ? isEditing
-                        ? "Saving..."
-                        : "Creating..."
-                      : isEditing
-                      ? "Save Changes"
-                      : "Create User"}
+                    {isSubmitting ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
               </div>
