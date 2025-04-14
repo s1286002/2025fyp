@@ -192,18 +192,8 @@ export const deleteUser = async (userId) => {
     // If the document has a uid field matching its id, it's also an auth user
     if (userDoc.data().uid === userId) {
       try {
-        // Note: Deleting a user from client-side requires additional auth permissions
-        // This should typically be done from a server admin context
-        // For client-side, the user needs to be currently signed in
-        if (auth.currentUser && auth.currentUser.uid === userId) {
-          await deleteAuthUser(auth.currentUser);
-          authDeleted = true;
-        } else {
-          // For deleting other users, this should be handled by a Cloud Function or admin SDK
-          console.warn(
-            "Cannot delete auth user from client SDK - requires admin privileges"
-          );
-        }
+        await deleteAuthUser(auth.currentUser);
+        authDeleted = true;
       } catch (authError) {
         console.error("Error deleting auth user:", authError);
       }
