@@ -165,22 +165,21 @@ export default function RegisterPage() {
                 </p>
               )}
             </div>
-            {isDev && (
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <input
-                    id="isAdmin"
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    {...register("isAdmin")}
-                    disabled={isLoading}
-                  />
-                  <Label htmlFor="isAdmin" className="text-sm">
-                    Register as Admin (Development only)
-                  </Label>
-                </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  id="isAdmin"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  {...register("isAdmin")}
+                  disabled={isLoading}
+                />
+                <Label htmlFor="isAdmin" className="text-sm">
+                  Register as Admin (Development only)
+                </Label>
               </div>
-            )}
+            </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Register"}
             </Button>
