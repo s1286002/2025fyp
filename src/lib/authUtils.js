@@ -116,8 +116,8 @@ export const registerUser = async (
       createdAt: serverTimestamp(),
       lastLogin: serverTimestamp(),
     });
-
-    return userCredential.user;
+    // dont login the user automatically
+    return true;
   } catch (error) {
     throw error;
   }
