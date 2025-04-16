@@ -4,10 +4,7 @@ import {
   getRawGameRecords,
 } from "@/lib/gameRecordUtils";
 import { getAllStudents, getStudentById } from "@/lib/studentUtils";
-import {
-  getGlobalErrorPatterns as fetchGlobalErrorPatterns,
-  getStudentErrorPatterns as fetchStudentErrorPatterns,
-} from "@/lib/errorPatternsUtil";
+import { getGlobalErrorPatterns as fetchGlobalErrorPatterns } from "@/lib/errorPatternsUtil";
 import { format, subDays, parseISO, isAfter, isBefore } from "date-fns";
 import { groupBy, orderBy, sumBy, meanBy, maxBy, minBy } from "lodash";
 
@@ -371,23 +368,6 @@ export const getStudentProgressStats = async (studentId, filters = {}) => {
     };
   } catch (error) {
     console.error("Error in getStudentProgressStats:", error);
-    throw error;
-  }
-};
-
-/**
- * 获取学生错误模式分析
- * @param {string} studentId - 学生ID
- * @param {object} filters - 可选的筛选条件
- * @returns {Promise<object>} - 学生错误模式分析数据
- */
-export const getStudentErrorPatterns = async (studentId, filters = {}) => {
-  try {
-    // 使用新的错误模式分析工具
-    const gameId = filters.gameType || null;
-    return await fetchStudentErrorPatterns(studentId, gameId);
-  } catch (error) {
-    console.error("Error in getStudentErrorPatterns:", error);
     throw error;
   }
 };

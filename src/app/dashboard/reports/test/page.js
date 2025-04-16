@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import {
   getGlobalProgressStats,
   getGlobalErrorPatterns,
-  getStudentErrorPatterns,
 } from "@/lib/reportUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -405,58 +404,6 @@ export default function TestReportsPage() {
               </div>
             ) : (
               <p className="text-gray-500">没有错误类型分布数据</p>
-            )}
-          </div>
-
-          {/* Error Frequency Trend */}
-          <div className="mb-8">
-            <h4 className="text-md font-medium mb-3">
-              错误频率趋势（最近7天）
-            </h4>
-            {errorPatternData.errorFrequencyTrend &&
-            errorPatternData.errorFrequencyTrend.length > 0 ? (
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border p-2 text-left">日期</th>
-                    <th className="border p-2 text-left">游戏类型</th>
-                    <th className="border p-2 text-left">错误数</th>
-                    <th className="border p-2 text-left">常见错误</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {errorPatternData.errorFrequencyTrend.map((day, dayIndex) =>
-                    day.dailyErrors.length > 0 ? (
-                      day.dailyErrors.map((error, errorIndex) => (
-                        <tr key={`${dayIndex}-${errorIndex}`}>
-                          {errorIndex === 0 && (
-                            <td
-                              className="border p-2"
-                              rowSpan={day.dailyErrors.length}
-                            >
-                              {day.date}
-                            </td>
-                          )}
-                          <td className="border p-2">{error.gameName}</td>
-                          <td className="border p-2">{error.errorCount}</td>
-                          <td className="border p-2">
-                            {error.commonErrors.join(", ")}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr key={dayIndex}>
-                        <td className="border p-2">{day.date}</td>
-                        <td className="border p-2 text-center" colSpan={3}>
-                          无错误记录
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
-            ) : (
-              <p className="text-gray-500">没有错误频率趋势数据</p>
             )}
           </div>
 

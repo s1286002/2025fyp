@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getStudentProgressStats } from "@/lib/reportUtils";
+import { getGlobalErrorPatterns } from "@/lib/errorPatternsUtil";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import {
   Card,
@@ -19,6 +20,7 @@ import {
   ScoreTrend,
   GameComparisonChart,
 } from "@/components/reports/ChartComponents";
+import { ErrorPatternsSection } from "@/components/reports/ErrorPatternsComponents";
 import { Badge } from "@/components/ui/badge";
 import {
   LineChart,
@@ -43,14 +45,14 @@ export default function StudentReportPage({ params }) {
   const [reportData, setReportData] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedGameType, setSelectedGameType] = useState(null);
+  const [errorPatternData, setErrorPatternData] = useState(null);
+  const [errorPatternLoading, setErrorPatternLoading] = useState(false);
 
   // Fetch student data
   const fetchStudentData = async () => {
     try {
       setLoading(true);
       const data = await getStudentProgressStats(studentId);
-
-      console.log(data);
       setReportData(data);
       setError(null);
     } catch (err) {
@@ -61,12 +63,44 @@ export default function StudentReportPage({ params }) {
     }
   };
 
+  // Fetch error pattern data
+  const fetchErrorPatternData = async (gameId = null) => {
+    if (!studentId) return;
+
+    try {
+      setErrorPatternLoading(true);
+      const filters = {
+        studentId,
+        limit: 50,
+      };
+
+      if (gameId) {
+        filters.gameId = gameId;
+      }
+
+      const data = await getGlobalErrorPatterns(filters);
+      setErrorPatternData(data);
+    } catch (err) {
+      console.error("Failed to fetch error pattern data:", err);
+      // Don't set the global error state here to avoid disrupting the entire page
+    } finally {
+      setErrorPatternLoading(false);
+    }
+  };
+
   // Initial data load
   useEffect(() => {
     if (studentId) {
       fetchStudentData();
     }
   }, [studentId]);
+
+  // Load error pattern data when tab is selected
+  useEffect(() => {
+    if (activeTab === "errorPatterns" && studentId && !errorPatternData) {
+      fetchErrorPatternData();
+    }
+  }, [activeTab, studentId, errorPatternData]);
 
   // Handle game selection
   const handleGameSelect = (gameType) => {
@@ -186,11 +220,12 @@ export default function StudentReportPage({ params }) {
           onValueChange={setActiveTab}
           className="space-y-4"
         >
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="gameDetails">Game Details</TabsTrigger>
             <TabsTrigger value="progress">Progress Trends</TabsTrigger>
             <TabsTrigger value="recent">Recent Activity</TabsTrigger>
+            <TabsTrigger value="errorPatterns">Error Patterns</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -497,6 +532,73 @@ export default function StudentReportPage({ params }) {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Error Patterns Tab */}
+          <TabsContent value="errorPatterns" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Student Error Patterns</CardTitle>
+                <CardDescription>
+                  Analysis of error patterns and common mistakes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {errorPatternLoading ? (
+                  <div className="flex justify-center items-center h-40">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  </div>
+                ) : errorPatternData ? (
+                  <ErrorPatternsSection errorPatternData={errorPatternData} />
+                ) : (
+                  <div className="text-center p-6">
+                    <p>No error pattern data available for this student</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Game-specific error pattern filter */}
+            {errorPatternData &&
+              errorPatternData.errorTypeDistribution &&
+              errorPatternData.errorTypeDistribution.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Filter by Game</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant={!selectedGameType ? "default" : "outline"}
+                        onClick={() => {
+                          setSelectedGameType(null);
+                          fetchErrorPatternData();
+                        }}
+                      >
+                        All Games
+                      </Button>
+                      {errorPatternData.errorTypeDistribution.map(
+                        (gameError) => (
+                          <Button
+                            key={gameError.gameType}
+                            variant={
+                              selectedGameType === gameError.gameType
+                                ? "default"
+                                : "outline"
+                            }
+                            onClick={() => {
+                              setSelectedGameType(gameError.gameType);
+                              fetchErrorPatternData(gameError.gameType);
+                            }}
+                          >
+                            {gameError.gameName}
+                          </Button>
+                        )
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
           </TabsContent>
         </Tabs>
       </div>

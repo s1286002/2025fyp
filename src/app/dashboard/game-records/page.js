@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Game1RecordCard from "@/components/game-records/Game1RecordCard";
 import Game2RecordCard from "@/components/game-records/Game2RecordCard";
+import Game3RecordCard from "@/components/game-records/Game3RecordCard";
 import { getAllStudentsGameRecords } from "@/lib/gameRecordUtils";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +14,7 @@ export default function GameRecordsPage() {
   const { user } = useAuth();
   const [game1Records, setGame1Records] = useState([]);
   const [game2Records, setGame2Records] = useState([]);
+  const [game3Records, setGame3Records] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,13 +22,15 @@ export default function GameRecordsPage() {
       if (!user?.uid) return;
 
       try {
-        const [game1Data, game2Data] = await Promise.all([
+        const [game1Data, game2Data, game3Data] = await Promise.all([
           getAllStudentsGameRecords("Game1"),
           getAllStudentsGameRecords("Game2"),
+          getAllStudentsGameRecords("Game3"),
         ]);
 
         setGame1Records(game1Data);
         setGame2Records(game2Data);
+        setGame3Records(game3Data);
       } catch (error) {
         console.error("Error loading game records:", error);
         toast.error("Failed to load game records");
@@ -57,6 +61,7 @@ export default function GameRecordsPage() {
           <TabsList>
             <TabsTrigger value="game1">Game 1</TabsTrigger>
             <TabsTrigger value="game2">Game 2</TabsTrigger>
+            <TabsTrigger value="game3">Game 3</TabsTrigger>
           </TabsList>
 
           <TabsContent value="game1" className="space-y-4">
@@ -82,6 +87,20 @@ export default function GameRecordsPage() {
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {game2Records.map((record) => (
                   <Game2RecordCard key={record.studentId} record={record} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="game3" className="space-y-4">
+            {game3Records.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-lg">
+                <p className="text-gray-500">No Game 3 records found.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {game3Records.map((record) => (
+                  <Game3RecordCard key={record.studentId} record={record} />
                 ))}
               </div>
             )}

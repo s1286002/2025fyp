@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getGlobalProgressStats } from "@/lib/reportUtils";
+import { getGlobalErrorPatterns } from "@/lib/errorPatternsUtil";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import {
   Card,
@@ -27,6 +28,11 @@ import {
   ResponsiveContainer,
   Pie,
   Cell,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
 } from "recharts";
 
 // Sample colors for charts
@@ -37,6 +43,11 @@ const COLORS = [
   "#FF8042",
   "#8884d8",
   "#82ca9d",
+  "#ff7c43",
+  "#665191",
+  "#ffa600",
+  "#6a0572",
+  "#1a8cff",
 ];
 
 export default function GlobalReportPage() {
@@ -44,6 +55,7 @@ export default function GlobalReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [reportData, setReportData] = useState(null);
+  const [errorPatternData, setErrorPatternData] = useState(null);
   const [activeTab, setActiveTab] = useState("summary");
   const [selectedGameType, setSelectedGameType] = useState(null);
 
@@ -53,6 +65,11 @@ export default function GlobalReportPage() {
       setLoading(true);
       const data = await getGlobalProgressStats();
       setReportData(data);
+
+      // Fetch error pattern data
+      const errorData = await getGlobalErrorPatterns();
+      setErrorPatternData(errorData);
+
       setSelectedGameType(null);
       setError(null);
     } catch (err) {
@@ -69,6 +86,11 @@ export default function GlobalReportPage() {
       setLoading(true);
       const data = await getGlobalProgressStats({ gameType });
       setReportData(data);
+
+      // Fetch error pattern data for specific game
+      const errorData = await getGlobalErrorPatterns({ gameId: gameType });
+      setErrorPatternData(errorData);
+
       setSelectedGameType(gameType);
       setError(null);
     } catch (err) {
@@ -560,6 +582,160 @@ export default function GlobalReportPage() {
     );
   };
 
+  // Render error patterns section
+  const renderErrorPatterns = () => {
+    if (!errorPatternData) return <div>No error pattern data available</div>;
+
+    // Format knowledge point/wrong answer for Game1
+    const formatGame1Value = (value) => {
+      // Check if the value is a numeric string (like "1", "2", etc.)
+      if (/^\d+$/.test(value)) {
+        return `单元${value}`;
+      }
+      return value;
+    };
+
+    return (
+      <div className="space-y-8">
+        {/* Error Type Distribution Section */}
+        <div>
+          <h3 className="text-lg font-semibold mb-4">
+            Error Type Distribution
+          </h3>
+          <div className="grid md:grid-cols-2 gap-6">
+            {errorPatternData.errorTypeDistribution.map((gameError) => (
+              <Card key={gameError.gameType} className="overflow-hidden">
+                <CardHeader>
+                  <CardTitle>{gameError.gameName}</CardTitle>
+                  <CardDescription>
+                    Total Errors: {gameError.totalErrors} | Sample Count:{" "}
+                    {gameError.sampleCount}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {/* Pie Chart for Error Distribution */}
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={gameError.errorPatterns
+                            .slice(0, 8)
+                            .map((pattern) => ({
+                              ...pattern,
+                              // Format display name for Game1
+                              displayName:
+                                gameError.gameType === "Game1"
+                                  ? formatGame1Value(pattern.wrongAnswer)
+                                  : pattern.wrongAnswer,
+                            }))}
+                          dataKey="count"
+                          nameKey="displayName"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          label={({ displayName, percentage }) =>
+                            `${displayName}: ${percentage}%`
+                          }
+                        >
+                          {gameError.errorPatterns
+                            .slice(0, 8)
+                            .map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={COLORS[index % COLORS.length]}
+                              />
+                            ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value, name, props) => [
+                            `${value} (${props.payload.percentage}%)`,
+                            `Wrong Answer: ${name}`,
+                          ]}
+                        />
+                        <Legend
+                          payload={gameError.errorPatterns
+                            .slice(0, 8)
+                            .map((item, index) => ({
+                              value:
+                                gameError.gameType === "Game1"
+                                  ? `${formatGame1Value(item.wrongAnswer)} (${
+                                      item.percentage
+                                    }%)`
+                                  : `${item.wrongAnswer} (${item.percentage}%)`,
+                              type: "circle",
+                              color: COLORS[index % COLORS.length],
+                            }))}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Error Details Table */}
+                  <div className="mt-4 max-h-60 overflow-y-auto">
+                    {gameError.gameType === "Game1" ? (
+                      // Special table layout for Game1
+                      <table className="min-w-full text-sm">
+                        <thead className="sticky top-0 bg-white">
+                          <tr>
+                            <th className="text-left p-2">单元</th>
+                            <th className="text-right p-2">错误次数</th>
+                            <th className="text-right p-2">百分比</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {gameError.errorPatterns.map((error) => (
+                            <tr key={error.wrongAnswer} className="border-t">
+                              <td className="p-2 font-medium">
+                                {formatGame1Value(error.wrongAnswer)}
+                              </td>
+                              <td className="p-2 text-right">{error.count}</td>
+                              <td className="p-2 text-right">
+                                {error.percentage}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      // Standard table for other games
+                      <table className="min-w-full text-sm">
+                        <thead className="sticky top-0 bg-white">
+                          <tr>
+                            <th className="text-left p-2">Wrong Answer</th>
+                            <th className="text-right p-2">Count</th>
+                            <th className="text-right p-2">Percentage</th>
+                            <th className="text-left p-2">Knowledge Points</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {gameError.errorPatterns.map((error) => (
+                            <tr key={error.wrongAnswer} className="border-t">
+                              <td className="p-2 font-medium">
+                                {error.wrongAnswer}
+                              </td>
+                              <td className="p-2 text-right">{error.count}</td>
+                              <td className="p-2 text-right">
+                                {error.percentage}%
+                              </td>
+                              <td className="p-2 text-xs">
+                                {error.knowledgePoint.slice(0, 3).join(", ")}
+                                {error.knowledgePoint.length > 3 && "..."}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render raw data
   const renderRawData = () => {
     if (!reportData.rawData) return null;
@@ -630,12 +806,16 @@ export default function GlobalReportPage() {
             <TabsTrigger value="summary">Summary</TabsTrigger>
             <TabsTrigger value="gameTypes">Game Types</TabsTrigger>
             <TabsTrigger value="timeTrend">Time Trends</TabsTrigger>
+            <TabsTrigger value="errorPatterns">Error Patterns</TabsTrigger>
             <TabsTrigger value="rawData">Raw Data</TabsTrigger>
           </TabsList>
 
           <TabsContent value="summary">{renderSummary()}</TabsContent>
           <TabsContent value="gameTypes">{renderGameTypeStats()}</TabsContent>
           <TabsContent value="timeTrend">{renderTimeTrend()}</TabsContent>
+          <TabsContent value="errorPatterns">
+            {renderErrorPatterns()}
+          </TabsContent>
           <TabsContent value="rawData">{renderRawData()}</TabsContent>
         </Tabs>
       </div>

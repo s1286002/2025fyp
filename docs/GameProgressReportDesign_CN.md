@@ -212,30 +212,6 @@
       - 单位错误：15%
       - 其他错误：10%
       ```
-  - 错误频率趋势图
-    - 数据结构：
-      ```typescript
-      interface ErrorFrequencyTrend {
-        date: string;
-        dailyErrors: {
-          gameType: string;
-          errorCount: number;
-          commonErrors: string[];
-        }[];
-      }
-      ```
-    - 展示内容：
-      - 每日错误总数趋势
-      - 按游戏类型分类的趋势
-      - 特定日期详细错误情况
-    - 示例：
-      ```
-      过去7天错误趋势：
-      - 周一：15次错误
-      - 周二：12次错误
-      - 周三：8次错误
-      ...
-      ```
   - 错误集中领域雷达图
     - 数据结构：
       ```typescript
@@ -243,8 +219,6 @@
         knowledgePoints: {
           point: string;
           errorCount: number;
-          difficulty: number;
-          improvement: number;
         }[];
       }
       ```
