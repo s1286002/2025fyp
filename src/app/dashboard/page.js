@@ -28,32 +28,40 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="text-lg font-semibold mb-2">Student Overview</h3>
-            <p className="text-gray-600 mb-4">
-              View and manage your students' profiles and information.
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => router.push("/dashboard/students")}
-              className="w-full"
-            >
-              View Students
-            </Button>
+          <Card>
+            <CardHeader>
+              <CardTitle>Student Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p>View and manage your students' profiles and information.</p>
+              <div className="flex flex-col gap-2 mt-4">
+                <Button
+                  variant="primary"
+                  onClick={() => router.push("/dashboard/students")}
+                  className="w-full"
+                >
+                  View Students
+                </Button>
+              </div>
+            </CardContent>
           </Card>
 
-          <Card className="p-6 hover:shadow-lg transition-shadow">
-            <h3 className="text-lg font-semibold mb-2">Game Records</h3>
-            <p className="text-gray-600 mb-4">
-              Monitor your students' progress and performance in games.
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => router.push("/dashboard/game-records")}
-              className="w-full"
-            >
-              View Records
-            </Button>
+          <Card>
+            <CardHeader>
+              <CardTitle>Game Records</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p>Monitor your students' progress and performance in games.</p>
+              <div className="flex flex-col gap-2 mt-4">
+                <Button
+                  variant="primary"
+                  onClick={() => router.push("/dashboard/game-records")}
+                  className="w-full"
+                >
+                  View Records
+                </Button>
+              </div>
+            </CardContent>
           </Card>
 
           <Card>
@@ -64,17 +72,11 @@ export default function DashboardPage() {
               <p>Generate performance reports for students and games</p>
               <div className="flex flex-col gap-2 mt-4">
                 <Button
+                  variant="primary"
                   onClick={() => router.push("/dashboard/reports")}
                   className="w-full"
                 >
                   View Reports
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => router.push("/dashboard/reports/test")}
-                  className="w-full"
-                >
-                  Test Reports
                 </Button>
               </div>
             </CardContent>
