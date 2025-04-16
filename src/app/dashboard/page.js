@@ -61,8 +61,22 @@ export default function DashboardPage() {
               <CardTitle>Reports</CardTitle>
             </CardHeader>
             <CardContent>
-              <p>Generate performance reports</p>
-              <p className="text-gray-500 mt-2">Coming soon</p>
+              <p>Generate performance reports for students and games</p>
+              <div className="flex flex-col gap-2 mt-4">
+                <Button
+                  onClick={() => router.push("/dashboard/reports")}
+                  className="w-full"
+                >
+                  View Reports
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push("/dashboard/reports/test")}
+                  className="w-full"
+                >
+                  Test Reports
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
