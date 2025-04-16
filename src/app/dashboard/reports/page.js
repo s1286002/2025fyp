@@ -70,7 +70,7 @@ export default function ReportsPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <CardTitle>Global Report</CardTitle>
@@ -79,93 +79,71 @@ export default function ReportsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600">
                 This report provides an overview of game activity, performance
                 metrics, and trends across your entire student population.
               </p>
+              <div className="flex flex-col gap-2 mt-4">
+                <Button
+                  variant="primary"
+                  onClick={goToGlobalReport}
+                  className="w-full"
+                >
+                  View Global Report
+                </Button>
+              </div>
             </CardContent>
-            <CardFooter>
-              <Button onClick={goToGlobalReport} className="w-full">
-                View Global Report
-              </Button>
-            </CardFooter>
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
-              <CardTitle>Test Report</CardTitle>
+              <CardTitle>Student Reports</CardTitle>
               <CardDescription>
-                Test page for report functionality
+                Choose a student to view their game progress report
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
-                This page is for testing report components and data
-                visualization.
-              </p>
+              {loading ? (
+                <p className="text-gray-500">Loading student data...</p>
+              ) : error ? (
+                <div className="bg-red-50 p-4 rounded-md text-red-600 border border-red-200">
+                  {error}
+                </div>
+              ) : students.length === 0 ? (
+                <div className="bg-yellow-50 p-4 rounded-md text-yellow-600 border border-yellow-200">
+                  No students found. Add students to view their reports.
+                </div>
+              ) : (
+                <>
+                  <Select
+                    value={selectedStudent}
+                    onValueChange={setSelectedStudent}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a student" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {students.map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name || student.userName || student.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-col gap-2 mt-4">
+                    <Button
+                      variant="primary"
+                      className="w-full"
+                      onClick={() => goToStudentReport(selectedStudent)}
+                      disabled={!selectedStudent}
+                    >
+                      View Student Report
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
-            <CardFooter>
-              <Button
-                onClick={goToTestPage}
-                variant="outline"
-                className="w-full"
-              >
-                Go to Test Page
-              </Button>
-            </CardFooter>
           </Card>
-        </div>
-
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">Student Reports</h2>
-          {loading ? (
-            <div className="flex justify-center items-center h-40">
-              <p className="text-gray-500">Loading student data...</p>
-            </div>
-          ) : error ? (
-            <div className="bg-red-50 p-4 rounded-md text-red-600 border border-red-200">
-              {error}
-            </div>
-          ) : students.length === 0 ? (
-            <div className="bg-yellow-50 p-4 rounded-md text-yellow-600 border border-yellow-200">
-              No students found. Add students to view their reports.
-            </div>
-          ) : (
-            <Card className="max-w-md mx-auto">
-              <CardHeader>
-                <CardTitle>Select a Student</CardTitle>
-                <CardDescription>
-                  Choose a student to view their game progress report
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Select
-                  value={selectedStudent}
-                  onValueChange={setSelectedStudent}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a student" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.name || student.userName || student.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  onClick={() => goToStudentReport(selectedStudent)}
-                  disabled={!selectedStudent}
-                >
-                  View Student Report
-                </Button>
-              </CardFooter>
-            </Card>
-          )}
         </div>
       </div>
     </ProtectedRoute>
