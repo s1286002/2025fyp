@@ -13,373 +13,465 @@ import { format, subDays } from "date-fns";
 import { groupBy, orderBy as _orderBy } from "lodash";
 
 /**
- * 获取学生的错误模式数据
- * @param {string} studentId - 学生ID
- * @param {string} gameId - 游戏ID (可选)
- * @returns {Promise<Object>} - 错误模式数据
+ * 生成错误类型分布数据
+ * @param {Array} errorPatterns - 错误模式数据数组
+ * @returns {Array} - 按游戏类型分组的错误分布数据
  */
-export const getStudentErrorPatterns = async (studentId, gameId = null) => {
-  try {
-    // 创建用户引用
-    const userRef = doc(db, "users", studentId);
+export const generateErrorTypeDistribution = (errorPatterns) => {
+  // 按游戏类型分组
+  const groupedByGame = groupBy(errorPatterns, "gameId");
 
-    // 查询条件
-    const q = query(
-      collection(db, "errorPatterns"),
-      where("userId", "==", userRef)
-    );
-    if (gameId) {
-      const gameRef = doc(db, "games", gameId);
-      q = query(
-        collection(db, "errorPatterns"),
-        where("userId", "==", userRef),
-        where("gameId", "==", gameRef)
-      );
-    }
-
-    const querySnapshot = await getDocs(q);
-
-    console.log("querySnapshot", querySnapshot);
-
-    // 如果没有记录，返回空数据
-    if (querySnapshot.empty) {
-      return { errorTypeDistribution: [], errorFrequencyTrend: [] };
-    }
-
-    // 处理错误模式数据
-    const errorPatterns = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      // 确保 lastUpdated 被转换为日期对象
-      lastUpdated: doc.data().lastUpdated?.toDate(),
-    }));
-
-    // 按游戏类型分组
-    const patternsByGame = {};
-    for (const pattern of errorPatterns) {
-      // 获取游戏信息
-      const gameDoc = await getDoc(pattern.gameId);
-      const gameData = gameDoc.exists() ? gameDoc.data() : null;
-      const gameType = gameData ? gameDoc.id : "unknown";
-
-      if (!patternsByGame[gameType]) {
-        patternsByGame[gameType] = {
-          gameType,
-          gameName: gameData?.name || gameType,
-          patterns: [],
-        };
-      }
-
-      patternsByGame[gameType].patterns.push(pattern);
-    }
-
-    // 错误类型分布
-    const errorTypeDistribution = Object.values(patternsByGame).map(
-      (gameGroup) => {
-        // 处理每个游戏的错误模式
-        const errorPatterns = [];
-
-        gameGroup.patterns.forEach((pattern) => {
-          if (pattern.errorAnswers) {
-            Object.values(pattern.errorAnswers).forEach((error) => {
-              errorPatterns.push({
-                wrongAnswer: error.wrongAnswer,
-                count: error.errorCount,
-                knowledgePoint: error.knowledgePoint,
-              });
+  // 生成每种游戏的错误类型分布
+  return Object.entries(groupedByGame)
+    .map(([gameType, patterns]) => {
+      // 收集所有错误答案
+      const allErrors = [];
+      patterns.forEach((pattern) => {
+        if (pattern.errorAnswers) {
+          Object.values(pattern.errorAnswers).forEach((error) => {
+            allErrors.push({
+              wrongAnswer: error.wrongAnswer,
+              knowledgePoint: error.knowledgePoint,
+              count: error.errorCount || 0,
             });
-          }
-        });
-
-        // 按错误次数排序
-        const sortedPatterns = _orderBy(errorPatterns, ["count"], ["desc"]);
-
-        return {
-          gameType: gameGroup.gameType,
-          gameName: gameGroup.gameName,
-          errorPatterns: sortedPatterns.slice(0, 5), // 取前5个最常见错误
-        };
-      }
-    );
-
-    // 错误频率趋势 - 生成过去7天的趋势
-    const errorFrequencyTrend = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = format(subDays(new Date(), i), "yyyy-MM-dd");
-      const dailyErrors = Object.values(patternsByGame)
-        .map((gameGroup) => {
-          // 计算该日期的错误数
-          let errorCount = 0;
-          const commonErrors = [];
-
-          gameGroup.patterns.forEach((pattern) => {
-            if (pattern.errorAnswers) {
-              Object.values(pattern.errorAnswers).forEach((error) => {
-                if (error.lastAttemptTime) {
-                  const errorDate = format(
-                    error.lastAttemptTime.toDate(),
-                    "yyyy-MM-dd"
-                  );
-                  if (errorDate === date) {
-                    errorCount += error.errorCount;
-                    commonErrors.push(error.wrongAnswer);
-                  }
-                }
-              });
-            }
           });
+        }
+      });
 
+      // 按错误答案分组
+      const groupedByWrongAnswer = groupBy(allErrors, "wrongAnswer");
+
+      // 计算每种错误的总数和百分比
+      const totalErrors = allErrors.reduce((sum, err) => sum + err.count, 0);
+      const errorPatterns = Object.entries(groupedByWrongAnswer)
+        .map(([wrongAnswer, errors]) => {
+          const count = errors.reduce((sum, err) => sum + err.count, 0);
           return {
-            gameType: gameGroup.gameType,
-            gameName: gameGroup.gameName,
-            errorCount,
-            commonErrors: commonErrors.slice(0, 3), // 最多显示3个常见错误
+            wrongAnswer,
+            count,
+            percentage:
+              totalErrors > 0 ? Math.round((count / totalErrors) * 100) : 0,
+            knowledgePoint: errors.map((e) => e.knowledgePoint),
           };
         })
-        .filter((gameError) => gameError.errorCount > 0); // 只保留有错误的游戏
+        .sort((a, b) => b.count - a.count);
 
-      errorFrequencyTrend.push({ date, dailyErrors });
+      return {
+        gameType,
+        totalErrors,
+        errorPatterns,
+        // 添加游戏名称和总样本数
+        gameName: getGameName(gameType),
+        sampleCount: patterns.length,
+      };
+    })
+    .filter((item) => item.totalErrors > 0); // 只返回有错误的游戏
+};
+
+/**
+ * 生成错误集中领域雷达图数据
+ * @param {Array} errorPatterns - 错误模式数据数组
+ * @returns {Object} - 错误集中领域数据
+ */
+export const generateErrorConcentration = (errorPatterns) => {
+  // 收集所有知识点的错误
+  const knowledgePointErrors = {};
+
+  errorPatterns.forEach((pattern) => {
+    if (pattern.errorAnswers) {
+      Object.values(pattern.errorAnswers).forEach((error) => {
+        const point = error.knowledgePoint;
+        if (point) {
+          if (!knowledgePointErrors[point]) {
+            knowledgePointErrors[point] = {
+              point,
+              errorCount: 0,
+              gameTypes: new Set(),
+              wrongAnswers: {},
+            };
+          }
+
+          knowledgePointErrors[point].errorCount += error.errorCount || 0;
+          knowledgePointErrors[point].gameTypes.add(pattern.gameId);
+
+          // 记录错误答案分布
+          if (!knowledgePointErrors[point].wrongAnswers[error.wrongAnswer]) {
+            knowledgePointErrors[point].wrongAnswers[error.wrongAnswer] = 0;
+          }
+          knowledgePointErrors[point].wrongAnswers[error.wrongAnswer] +=
+            error.errorCount || 0;
+        }
+      });
     }
+  });
 
-    return {
-      errorTypeDistribution,
-      errorFrequencyTrend,
-    };
-  } catch (error) {
-    console.error("Error in getStudentErrorPatterns:", error);
-    throw error;
-  }
+  // 转换为数组并排序
+  const knowledgePoints = Object.values(knowledgePointErrors)
+    .map((item) => ({
+      point: item.point,
+      errorCount: item.errorCount,
+      gameCount: item.gameTypes.size,
+      // 错误分布
+      errorDistribution: Object.entries(item.wrongAnswers)
+        .map(([answer, count]) => ({
+          answer,
+          count,
+          percentage: Math.round((count / item.errorCount) * 100),
+        }))
+        .sort((a, b) => b.count - a.count),
+      // 计算错误难度 (1-3)，基于错误次数的相对值
+      errorDifficulty: calculateErrorDifficulty(
+        item.errorCount,
+        Math.max(
+          ...Object.values(knowledgePointErrors).map((k) => k.errorCount)
+        )
+      ),
+    }))
+    .sort((a, b) => b.errorCount - a.errorCount);
+
+  return {
+    knowledgePoints,
+    totalErrors: knowledgePoints.reduce(
+      (sum, point) => sum + point.errorCount,
+      0
+    ),
+    totalKnowledgePoints: knowledgePoints.length,
+    // 分类错误难度
+    difficultyGroups: {
+      high: knowledgePoints.filter((p) => p.errorDifficulty === 3).length,
+      medium: knowledgePoints.filter((p) => p.errorDifficulty === 2).length,
+      low: knowledgePoints.filter((p) => p.errorDifficulty === 1).length,
+    },
+  };
+};
+
+/**
+ * 计算错误的难度等级
+ * @param {number} errorCount - 错误次数
+ * @param {number} maxErrorCount - 最大错误次数
+ * @returns {number} - 难度等级 (1-3)
+ */
+const calculateErrorDifficulty = (errorCount, maxErrorCount) => {
+  if (maxErrorCount === 0) return 1;
+  const ratio = errorCount / maxErrorCount;
+  if (ratio >= 0.7) return 3; // 高难度
+  if (ratio >= 0.3) return 2; // 中等难度
+  return 1; // 低难度
+};
+
+/**
+ * 获取游戏名称
+ * @param {string} gameId - 游戏ID
+ * @returns {string} - 游戏名称
+ */
+const getGameName = (gameId) => {
+  const gameNames = {
+    Game1: "汉字图片连连看",
+    Game2: "汉字偏旁消消乐",
+    Game3: "量词贪吃蛇",
+  };
+  return gameNames[gameId] || gameId;
 };
 
 /**
  * 获取全局错误模式分析
  * @param {object} filters - 可选的筛选条件
+ * @param {string} filters.gameId - 游戏ID筛选
+ * @param {string} filters.studentId - 学生ID筛选
+ * @param {Date} filters.startDate - 开始日期
+ * @param {Date} filters.endDate - 结束日期
+ * @param {number} filters.limit - 结果数量限制
  * @returns {Promise<object>} - 全局错误模式分析数据
  */
 export const getGlobalErrorPatterns = async (filters = {}) => {
   try {
     // 基础查询
-    const q = query(
-      collection(db, "errorPatterns"),
-      orderBy("lastUpdated", "desc"),
-      limit(100) // 限制查询，避免过多数据
-    );
+    let errorPatternQuery = collection(db, "errorPatterns");
 
-    // 应用游戏类型筛选条件
-    if (filters.gameType) {
-      const gameRef = doc(db, "games", filters.gameType);
-      q = query(
-        collection(db, "errorPatterns"),
-        where("gameId", "==", gameRef),
-        orderBy("lastUpdated", "desc"),
-        limit(100)
+    console.log(filters);
+
+    // 应用筛选条件
+    if (filters.gameId) {
+      // 使用引用类型来匹配GameId
+      const gameRef = doc(db, "games", filters.gameId);
+      errorPatternQuery = query(
+        errorPatternQuery,
+        where("GameId", "==", gameRef)
       );
     }
 
-    const querySnapshot = await getDocs(q);
-
-    // 如果没有记录，返回空数据
-    if (querySnapshot.empty) {
-      return { errorTypeDistribution: [], errorFrequencyTrend: [] };
+    // 添加学生ID筛选条件
+    if (filters.studentId) {
+      // 使用引用类型来匹配UserId
+      const userRef = doc(db, "users", filters.studentId);
+      errorPatternQuery = query(
+        errorPatternQuery,
+        where("UserId", "==", userRef)
+      );
     }
 
-    // 处理错误模式数据
-    const errorPatterns = await Promise.all(
-      querySnapshot.docs.map(async (doc) => {
-        const data = doc.data();
+    // 日期范围筛选
+    if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      errorPatternQuery = query(
+        errorPatternQuery,
+        where("LastUpdated", ">=", startDate)
+      );
+    }
 
-        // 获取用户信息
-        const userRef = data.userId;
-        const userDoc = await getDoc(userRef);
-        const userData = userDoc.exists() ? userDoc.data() : null;
+    if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      errorPatternQuery = query(
+        errorPatternQuery,
+        where("LastUpdated", "<=", endDate)
+      );
+    }
 
-        // 获取游戏信息
-        const gameRef = data.gameId;
-        const gameDoc = await getDoc(gameRef);
-        const gameData = gameDoc.exists() ? gameDoc.data() : null;
+    // 添加排序条件
+    if (filters.orderByField) {
+      errorPatternQuery = query(
+        errorPatternQuery,
+        orderBy(filters.orderByField, filters.orderDirection || "asc")
+      );
+    }
 
-        return {
-          id: doc.id,
-          ...data,
-          userName: userData?.userName || "Unknown User",
-          gameType: gameDoc.id,
-          gameName: gameData?.name || "Unknown Game",
-          // 确保 lastUpdated 被转换为日期对象
-          lastUpdated: data.lastUpdated?.toDate(),
-        };
-      })
-    );
+    // 限制结果数量（如果指定）
+    if (filters.limit) {
+      errorPatternQuery = query(errorPatternQuery, limit(filters.limit));
+    }
 
-    // 应用日期筛选条件
-    let filteredPatterns = errorPatterns;
-    if (filters.startDate && filters.endDate) {
-      filteredPatterns = errorPatterns.filter((pattern) => {
-        const patternDate = pattern.lastUpdated;
-        return (
-          patternDate >= new Date(filters.startDate) &&
-          patternDate <= new Date(filters.endDate)
-        );
+    const querySnapshot = await getDocs(errorPatternQuery);
+
+    // 处理查询结果
+    const errorPatterns = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      // 提取GameId的路径信息（如果是引用类型）
+      let gameId = "unknown";
+      if (data.GameId && data.GameId._key && data.GameId._key.path) {
+        const path = data.GameId._key.path;
+        if (path.segments && path.segments.length >= 7) {
+          gameId = path.segments[6]; // 获取路径中的游戏ID
+        }
+      }
+
+      // 提取UserId的值（如果是引用类型）
+      let userId = null;
+      if (data.UserId && data.UserId._key && data.UserId._key.path) {
+        const path = data.UserId._key.path;
+        if (path.segments && path.segments.length >= 7) {
+          userId = path.segments[6]; // 获取路径中的用户ID
+        }
+      }
+
+      // 规范化错误答案字段
+      const errorAnswers = {};
+      if (data.ErrorAnswers) {
+        Object.entries(data.ErrorAnswers).forEach(([key, value]) => {
+          errorAnswers[key] = {
+            knowledgePoint: value.KnowledgePoint,
+            wrongAnswer: value.WrongAnswer,
+            errorCount: value.ErrorCount,
+            lastAttemptTime: value.LastAttemptTime,
+          };
+        });
+      }
+
+      // 将数据添加到数组中，使用统一的字段名
+      errorPatterns.push({
+        id: doc.id,
+        gameId,
+        userId,
+        errorAnswers,
+        lastUpdated: data.LastUpdated,
+        // 保留原始数据以备调试
+        _originalData: data,
       });
-    }
+    });
+
+    // 添加调试信息
+    console.log("Normalized Error Patterns:", errorPatterns);
 
     // 按游戏类型分组
-    const patternsByGame = groupBy(filteredPatterns, "gameType");
+    const groupedByGame = groupBy(errorPatterns, "gameId");
 
-    // 错误类型分布
-    const errorTypeDistribution = Object.keys(patternsByGame).map(
-      (gameType) => {
-        const patterns = patternsByGame[gameType];
-        const gameName = patterns[0]?.gameName || "Unknown Game";
+    // 调试分组结果
+    console.log("Grouped By Game:", Object.keys(groupedByGame));
 
-        // 收集所有错误
-        const allErrors = [];
-        patterns.forEach((pattern) => {
-          if (pattern.errorAnswers) {
+    // 对每种游戏类型进行错误分析
+    const gameAnalysis = {};
+
+    for (const [gameId, patterns] of Object.entries(groupedByGame)) {
+      if (!gameId || gameId === "undefined") {
+        console.warn("发现无效的gameId，跳过分析", patterns.length);
+        continue;
+      }
+
+      // 收集所有知识点的错误
+      const allKnowledgePointErrors = [];
+      patterns.forEach((pattern) => {
+        if (pattern.errorAnswers) {
+          // 确保errorAnswers是对象并且有值
+          if (
+            typeof pattern.errorAnswers === "object" &&
+            pattern.errorAnswers !== null
+          ) {
             Object.values(pattern.errorAnswers).forEach((error) => {
-              allErrors.push({
-                wrongAnswer: error.wrongAnswer,
-                count: error.errorCount,
-                knowledgePoint: error.knowledgePoint,
-              });
+              if (error && error.knowledgePoint) {
+                allKnowledgePointErrors.push(error);
+              }
             });
           }
-        });
+        }
+      });
 
-        // 合并相同错误答案的记录
-        const mergedErrors = {};
-        allErrors.forEach((error) => {
-          const key = `${error.knowledgePoint}_${error.wrongAnswer}`;
-          if (!mergedErrors[key]) {
-            mergedErrors[key] = { ...error };
-          } else {
-            mergedErrors[key].count += error.count;
+      // 调试知识点错误
+      console.log(
+        `GameID ${gameId}: 发现 ${allKnowledgePointErrors.length} 个知识点错误`
+      );
+
+      // 按知识点分组
+      const groupedByKnowledgePoint = groupBy(
+        allKnowledgePointErrors,
+        "knowledgePoint"
+      );
+
+      // 计算每个知识点的错误统计
+      const knowledgePointStats = Object.keys(groupedByKnowledgePoint)
+        .map((point) => {
+          if (!point || point === "undefined") {
+            return null;
           }
-        });
 
-        // 按错误次数排序
-        const sortedPatterns = _orderBy(
-          Object.values(mergedErrors),
-          ["count"],
-          ["desc"]
+          const errors = groupedByKnowledgePoint[point];
+          const totalErrors = errors.reduce(
+            (sum, error) => sum + (error.errorCount || 0),
+            0
+          );
+
+          // 统计错误答案分布
+          const wrongAnswerMap = {};
+          errors.forEach((error) => {
+            if (error.wrongAnswer) {
+              if (!wrongAnswerMap[error.wrongAnswer]) {
+                wrongAnswerMap[error.wrongAnswer] = 0;
+              }
+              wrongAnswerMap[error.wrongAnswer] += error.errorCount || 0;
+            }
+          });
+
+          const errorDistribution = Object.entries(wrongAnswerMap)
+            .map(([answer, count]) => ({
+              answer,
+              count,
+              percentage:
+                totalErrors > 0 ? Math.round((count / totalErrors) * 100) : 0,
+            }))
+            .sort((a, b) => b.count - a.count);
+
+          return {
+            knowledgePoint: point,
+            totalErrors,
+            errorDistribution,
+          };
+        })
+        .filter(Boolean) // 过滤掉无效的知识点
+        .sort((a, b) => b.totalErrors - a.totalErrors);
+
+      gameAnalysis[gameId] = {
+        totalPatterns: patterns.length,
+        totalStudents: new Set(patterns.map((p) => p.userId).filter(Boolean))
+          .size,
+        knowledgePointStats,
+        totalErrors: knowledgePointStats.reduce(
+          (sum, point) => sum + point.totalErrors,
+          0
+        ),
+      };
+    }
+
+    // 按知识点分组错误（为了兼容原来的getStudentErrorPatterns函数输出）
+    const groupedByKnowledgePoint = {};
+    errorPatterns.forEach((pattern) => {
+      if (pattern.errorAnswers) {
+        Object.values(pattern.errorAnswers).forEach((error) => {
+          if (!groupedByKnowledgePoint[error.knowledgePoint]) {
+            groupedByKnowledgePoint[error.knowledgePoint] = [];
+          }
+          groupedByKnowledgePoint[error.knowledgePoint].push(error);
+        });
+      }
+    });
+
+    // 计算每个知识点的错误频率和最近错误时间（为了兼容原来的输出格式）
+    const knowledgePointAnalysis = Object.keys(groupedByKnowledgePoint).map(
+      (point) => {
+        const errors = groupedByKnowledgePoint[point];
+        const totalErrors = errors.reduce(
+          (sum, error) => sum + error.errorCount,
+          0
         );
 
+        let lastAttemptTime;
+        try {
+          lastAttemptTime = new Date(
+            Math.max(
+              ...errors.map((e) =>
+                e.lastAttemptTime.toMillis
+                  ? e.lastAttemptTime.toMillis()
+                  : e.lastAttemptTime instanceof Date
+                  ? e.lastAttemptTime.getTime()
+                  : new Date(e.lastAttemptTime).getTime()
+              )
+            )
+          );
+        } catch (e) {
+          lastAttemptTime = new Date();
+        }
+
+        // 错误答案分布
+        const wrongAnswers = errors
+          .map((e) => ({
+            answer: e.wrongAnswer,
+            count: e.errorCount,
+          }))
+          .sort((a, b) => b.count - a.count);
+
         return {
-          gameType,
-          gameName,
-          errorPatterns: sortedPatterns.slice(0, 10), // 取前10个最常见错误
+          knowledgePoint: point,
+          totalErrors,
+          lastAttemptTime,
+          wrongAnswers,
         };
       }
     );
 
-    // 错误频率趋势 - 生成过去7天的趋势
-    const errorFrequencyTrend = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = format(subDays(new Date(), i), "yyyy-MM-dd");
-      const dailyErrors = Object.keys(patternsByGame)
-        .map((gameType) => {
-          const patterns = patternsByGame[gameType];
-          const gameName = patterns[0]?.gameName || "Unknown Game";
+    // 生成错误类型分布和错误集中领域数据
+    const errorTypeDistribution = generateErrorTypeDistribution(errorPatterns);
+    const errorConcentration = generateErrorConcentration(errorPatterns);
 
-          // 计算该日期的错误数
-          let errorCount = 0;
-          const commonErrors = new Set();
-
-          patterns.forEach((pattern) => {
-            if (pattern.errorAnswers) {
-              Object.values(pattern.errorAnswers).forEach((error) => {
-                if (error.lastAttemptTime) {
-                  const errorDate = format(
-                    error.lastAttemptTime.toDate(),
-                    "yyyy-MM-dd"
-                  );
-                  if (errorDate === date) {
-                    errorCount += error.errorCount;
-                    commonErrors.add(error.wrongAnswer);
-                  }
-                }
-              });
-            }
-          });
-
-          return {
-            gameType,
-            gameName,
-            errorCount,
-            commonErrors: Array.from(commonErrors).slice(0, 3), // 最多显示3个常见错误
-          };
-        })
-        .filter((gameError) => gameError.errorCount > 0); // 只保留有错误的游戏
-
-      errorFrequencyTrend.push({ date, dailyErrors });
-    }
-
-    // 按知识点分析错误集中度
-    const errorConcentration = Object.keys(patternsByGame).map((gameType) => {
-      const patterns = patternsByGame[gameType];
-      const gameName = patterns[0]?.gameName || "Unknown Game";
-
-      // 收集按知识点分组的错误
-      const knowledgePointErrors = {};
-      patterns.forEach((pattern) => {
-        if (pattern.errorAnswers) {
-          Object.values(pattern.errorAnswers).forEach((error) => {
-            const kp = error.knowledgePoint;
-            if (!knowledgePointErrors[kp]) {
-              knowledgePointErrors[kp] = {
-                point: kp,
-                errorCount: 0,
-                uniqueStudents: new Set(),
-                wrongAnswers: {},
-              };
-            }
-
-            knowledgePointErrors[kp].errorCount += error.errorCount;
-            knowledgePointErrors[kp].uniqueStudents.add(pattern.userName);
-
-            // 记录错误答案频率
-            if (!knowledgePointErrors[kp].wrongAnswers[error.wrongAnswer]) {
-              knowledgePointErrors[kp].wrongAnswers[error.wrongAnswer] = 0;
-            }
-            knowledgePointErrors[kp].wrongAnswers[error.wrongAnswer] +=
-              error.errorCount;
-          });
-        }
-      });
-
-      // 将知识点转换为数组并计算难度和改进空间
-      const knowledgePoints = Object.values(knowledgePointErrors).map((kp) => {
-        // 难度 = 错误次数 / 学生数
-        const difficulty = kp.errorCount / kp.uniqueStudents.size;
-
-        // 改进空间 = 按错误次数排名的位置
-        const improvement = kp.errorCount;
-
-        return {
-          point: kp.point,
-          errorCount: kp.errorCount,
-          difficulty,
-          improvement,
-          uniqueStudents: kp.uniqueStudents.size,
-          // 最常见的错误答案
-          commonWrongAnswers: Object.entries(kp.wrongAnswers)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map(([answer, count]) => ({ answer, count })),
-        };
-      });
-
-      return {
-        gameType,
-        gameName,
-        knowledgePoints: _orderBy(knowledgePoints, ["errorCount"], ["desc"]),
-      };
-    });
-
-    return {
+    // 构建最终的返回结果，兼容两个函数的输出格式
+    const result = {
+      filters,
+      totalRecords: errorPatterns.length,
+      gameAnalysis,
       errorTypeDistribution,
-      errorFrequencyTrend,
       errorConcentration,
     };
+
+    // 如果是按学生ID筛选，添加学生特定的数据
+    if (filters.studentId) {
+      result.studentId = filters.studentId;
+      result.gameId = filters.gameId;
+      result.rawData = errorPatterns;
+      result.knowledgePointAnalysis = knowledgePointAnalysis;
+      result.totalErrorCount = knowledgePointAnalysis.reduce(
+        (sum, point) => sum + point.totalErrors,
+        0
+      );
+    }
+
+    return result;
   } catch (error) {
     console.error("Error in getGlobalErrorPatterns:", error);
     throw error;
@@ -387,15 +479,86 @@ export const getGlobalErrorPatterns = async (filters = {}) => {
 };
 
 /**
- * 分析错误模式中的常见问题
- * @param {Array} errorPatterns - 错误模式数据
- * @returns {Object} - 分析结果
+ * 获取学生在特定时间段内的错误模式趋势
+ * @param {string} studentId - 学生ID
+ * @param {number} days - 回溯的天数
+ * @returns {Promise<Object>} - 错误模式趋势数据
  */
-export const analyzeErrorPatterns = (errorPatterns) => {
-  // 实现错误模式分析逻辑
-  // 例如：识别重复错误、错误趋势、常见错误类型等
+export const getStudentErrorTrends = async (studentId, days = 30) => {
+  try {
+    const startDate = subDays(new Date(), days);
 
-  return {
-    // 分析结果
-  };
+    // 使用增强后的getGlobalErrorPatterns函数获取数据
+    const errorData = await getGlobalErrorPatterns({
+      studentId,
+      startDate,
+      orderByField: "LastUpdated",
+      orderDirection: "asc",
+    });
+
+    const errorPatterns = errorData.rawData || [];
+
+    // 按日期分组
+    const dailyErrors = {};
+
+    errorPatterns.forEach((pattern) => {
+      if (pattern.errorAnswers) {
+        const lastUpdatedDate = pattern.lastUpdated.toDate
+          ? pattern.lastUpdated.toDate()
+          : new Date(pattern.lastUpdated);
+        const dateKey = format(lastUpdatedDate, "yyyy-MM-dd");
+
+        if (!dailyErrors[dateKey]) {
+          dailyErrors[dateKey] = { total: 0, byKnowledgePoint: {} };
+        }
+
+        Object.values(pattern.errorAnswers).forEach((error) => {
+          dailyErrors[dateKey].total += error.errorCount;
+
+          if (!dailyErrors[dateKey].byKnowledgePoint[error.knowledgePoint]) {
+            dailyErrors[dateKey].byKnowledgePoint[error.knowledgePoint] = 0;
+          }
+
+          dailyErrors[dateKey].byKnowledgePoint[error.knowledgePoint] +=
+            error.errorCount;
+        });
+      }
+    });
+
+    // 生成时间序列数据
+    const dateLabels = [];
+    const errorCounts = [];
+
+    // 确保有连续的日期数据
+    for (let i = 0; i < days; i++) {
+      const date = subDays(new Date(), days - i - 1);
+      const dateKey = format(date, "yyyy-MM-dd");
+      dateLabels.push(dateKey);
+
+      if (dailyErrors[dateKey]) {
+        errorCounts.push(dailyErrors[dateKey].total);
+      } else {
+        errorCounts.push(0);
+      }
+    }
+
+    return {
+      studentId,
+      dateRange: {
+        start: format(startDate, "yyyy-MM-dd"),
+        end: format(new Date(), "yyyy-MM-dd"),
+      },
+      dailyErrors,
+      timeSeries: {
+        labels: dateLabels,
+        data: errorCounts,
+      },
+      // 添加新的数据结构
+      errorTypeDistribution: errorData.errorTypeDistribution,
+      errorConcentration: errorData.errorConcentration,
+    };
+  } catch (error) {
+    console.error("Error in getStudentErrorTrends:", error);
+    throw error;
+  }
 };
