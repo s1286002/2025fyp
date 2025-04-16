@@ -41,6 +41,8 @@ export const getStudentGameStats = async (userId, gameId) => {
       return processGame1Stats(records);
     } else if (gameId === "Game2") {
       return processGame2Stats(records);
+    } else if (gameId === "Game3") {
+      return processGame3Stats(records);
     }
 
     throw new Error("Invalid game ID");
@@ -112,6 +114,27 @@ const processGame2Stats = (records) => {
       (record.Level === stats.maxLevel && record.Score > stats.highestScore)
     ) {
       stats.maxLevel = record.Level;
+      stats.highestScore = record.Score;
+    }
+  });
+
+  return stats;
+};
+
+/**
+ * Process Game3 records into stats
+ * @param {Array} records - Array of game records
+ * @returns {Object} - Processed Game3 stats
+ */
+const processGame3Stats = (records) => {
+  const stats = {
+    playCount: 0,
+    highestScore: 0,
+  };
+
+  records.forEach((record) => {
+    stats.playCount++;
+    if (record.Score > stats.highestScore) {
       stats.highestScore = record.Score;
     }
   });
