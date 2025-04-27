@@ -43,3 +43,7 @@ workflow-rules*
 /xnotes
 .cursor*
 /.ai
+
+# Local environment variables
+.env.local
+.vscode
